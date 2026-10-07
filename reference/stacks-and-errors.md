@@ -2,25 +2,23 @@
 
 ## stackType values
 
-`stackType` is a free-text field — the API does not validate it
-against a fixed list, so a typo or unsupported value will not
-necessarily fail fast with a clear error. Stick to known-good values.
+`stackType` is a free-text field. The API refuses a known list of
+stacks and treats every other value as JavaScript/TypeScript, so a
+typo or an unlisted stack (for example `java`) is not refused: it is
+built as JS/TS. Stick to the values below.
 
-**Confirmed production-ready:**
+**Supported today: JavaScript and TypeScript only.**
 
 | stackType | Runtime | QA method |
 |---|---|---|
 | `worker` | TypeScript / Cloudflare Workers | Real test execution |
-| `python` | Python 3 | Real test execution (pytest, isolated) |
-| `go` | Go modules | Real test execution (go test, isolated) |
-| `swift-ios` | Swift | Real test execution (isolated) |
-| `kotlin-android` | Kotlin | Real test execution (isolated) |
+| `node`, `react` and variants | JavaScript / TypeScript | Real test execution |
 
-**Experimental:** `rust` — reliably plans and generates, but QA
-reliably fails on a known multi-crate-workspace vs. single-crate-harness
-mismatch. Expect `BUILD_FAILED_QA`/`ORACLE_INVALID`, not a working
-result — this is a known limitation, not something a better
-`acceptanceCriteria` will fix.
+**Refused with `UNSUPPORTED_STACK_TYPE`:** `python`, `go`, `swift`
+(`swift-ios`), `kotlin` (`kotlin-android`) and `rust`, plus `infra`,
+`terraform`, `docs`, `markdown`, `sql`, `bash` and `shell`. The reply
+names the supported stacks. A stack is opened once its results have
+been measured.
 
 **Retired — do not use:** `pages`, `expo`, `infra`, `design`.
 

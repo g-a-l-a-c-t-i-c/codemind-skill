@@ -59,7 +59,9 @@ Parse `tenantId:`/`apiKey:` out of the text (don't `JSON.parse` it).
 Every other tool call needs `Authorization: Bearer <apiKey>`.
 
 **Persist the key. Don't call `create_free_account` again** unless you
-have to — it's limited to 3 calls per IP per rolling 24 hours, keys
+have to — it's limited per IP per rolling 24 hours (the limit is a
+server setting and can change; treat an `IP_RATE_LIMIT_EXCEEDED` reply
+as final for that day), keys
 don't renew (90-day expiry, a new call means a brand-new unrelated
 account), and if a human already completed identity sign-in on the
 account via its claim URL, calling it again **silently creates a
@@ -71,6 +73,184 @@ tell apart from the rest; everything else (revoked, wrong key,
 malformed, tenant suspended) collapses to a generic `UNAUTHORIZED`.
 
 **Never print, log, or otherwise expose your `apiKey`.**
+
+### Onboarding prompt for a human to paste
+
+When a human asks how to set Codemind up in their own coding agent, give
+them one of these two prompts verbatim. Both are copies of
+`docs/onboarding-prompt.md` in the Codemind repository, which is the
+source; a test there fails if a copy differs. The new-account prompt has
+passed a full test (fresh account, saved config, a real build) on Claude
+Code, Cursor, Codex and OpenCode. Cline is not supported yet.
+
+No Codemind account yet:
+
+<!-- onboarding-prompt:new-account:start -->
+```text
+Set up Codemind for this project. Codemind is a remote MCP server that writes and verifies code from a story.
+
+Setup creates an account and stores its key. Do not create the account, read the key or write it anywhere yourself: some permission modes (Claude Code's auto mode, now its default) block an agent from storing a credential. I will run one setup script myself.
+
+1. Write this script, exactly as given, to ./codemind-setup.sh in this project. It contains no secret.
+
+#!/bin/sh
+# Creates a Codemind free account and wires it into the current project.
+# Usage: sh codemind-setup.sh [claude|cursor|codex|opencode]   (default: claude)
+# Claude Code, Cursor and OpenCode get a config file in this project; Codex
+# reads only its own config.toml in your home directory, so the entry goes there.
+# Run it yourself (in Claude Code: `! sh codemind-setup.sh`). It stores the key
+# in your shell profile and never prints it. The agent never sees the key.
+set -eu
+
+host="${1:-claude}"
+case "$host" in
+  claude)   file="./.mcp.json";         has='"codemind"' ;;
+  cursor)   file="./.cursor/mcp.json";  has='"codemind"' ;;
+  codex)    file="${CODEX_HOME:-$HOME/.codex}/config.toml"; has='mcp_servers.codemind' ;;
+  opencode) file="./opencode.json";     has='"codemind"' ;;
+  *) echo "Unknown agent '$host'. Use one of: claude, cursor, codex, opencode." >&2; exit 2 ;;
+esac
+
+if [ -n "${CODEMIND_API_KEY:-}" ]; then
+  echo "account:    CODEMIND_API_KEY is already set; using it, no new account created"
+else
+  case "${SHELL:-}" in
+    */zsh)  profile="$HOME/.zshrc" ;;
+    */bash) if [ "$(uname)" = Darwin ]; then profile="$HOME/.bash_profile"; else profile="$HOME/.bashrc"; fi ;;
+    *)      profile="$HOME/.profile" ;;
+  esac
+  # Check the profile is writable before creating an account, so a key is never created and then lost.
+  if ! : >> "$profile"; then
+    echo "Cannot write to $profile, so no account was created. Fix that and run this again." >&2
+    exit 1
+  fi
+
+  reply=$(curl -fsS -X POST https://api.codemindhq.dev/mcp \
+    -H 'content-type: application/json' \
+    -H 'accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_free_account","arguments":{}}}')
+
+  key=$(printf '%s' "$reply" | grep -o 'apiKey: [A-Za-z0-9._-]*' | head -1 | cut -d' ' -f2)
+  tenant=$(printf '%s' "$reply" | grep -o 'tenantId: [A-Za-z0-9-]*' | head -1 | cut -d' ' -f2)
+  claim=$(printf '%s' "$reply" | grep -o 'https://[^" \\]*claim[^" \\]*' | head -1)
+  if [ -z "$key" ]; then
+    echo "No apiKey in the reply (rate limited or an error). Reply text:" >&2
+    printf '%s\n' "$reply" | sed -E 's/apiKey: [A-Za-z0-9._-]+/apiKey: [redacted]/' | cut -c1-400 >&2
+    exit 1
+  fi
+
+  printf "\nexport CODEMIND_API_KEY='%s'\n" "$key" >> "$profile"
+
+  echo "tenantId:   $tenant"
+  echo "key stored: $profile (CODEMIND_API_KEY, not printed)"
+  echo "claim link: ${claim:-<none in reply>}"
+fi
+
+# The server entry for each agent. None of them contains the key: each names
+# the CODEMIND_API_KEY variable in that agent's own syntax.
+entry() {
+  case "$host" in
+    claude) cat <<'EOF'
+{
+  "mcpServers": {
+    "codemind": {
+      "type": "http",
+      "url": "https://api.codemindhq.dev/mcp",
+      "headers": { "Authorization": "Bearer ${CODEMIND_API_KEY}" }
+    }
+  }
+}
+EOF
+    ;;
+    cursor) cat <<'EOF'
+{
+  "mcpServers": {
+    "codemind": {
+      "url": "https://api.codemindhq.dev/mcp",
+      "headers": { "Authorization": "Bearer ${env:CODEMIND_API_KEY}" }
+    }
+  }
+}
+EOF
+    ;;
+    codex) cat <<'EOF'
+[mcp_servers.codemind]
+url = "https://api.codemindhq.dev/mcp"
+bearer_token_env_var = "CODEMIND_API_KEY"
+EOF
+    ;;
+    opencode) cat <<'EOF'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codemind": {
+      "type": "remote",
+      "url": "https://api.codemindhq.dev/mcp",
+      "oauth": false,
+      "headers": { "Authorization": "Bearer {env:CODEMIND_API_KEY}" },
+      "enabled": true
+    }
+  }
+}
+EOF
+    ;;
+  esac
+}
+
+if [ -f "$file" ] && grep -qF "$has" "$file"; then
+  echo "config:     $file already has a codemind entry; left as it is"
+elif [ ! -f "$file" ]; then
+  mkdir -p "$(dirname "$file")"
+  entry > "$file"
+  echo "wrote:      $file (no secret in it)"
+elif [ "$host" = codex ]; then
+  { printf '\n'; entry; } >> "$file"
+  echo "added:      codemind entry appended to $file (no secret in it)"
+else
+  echo "config:     $file already exists and was NOT changed."
+  echo "            Ask your agent to merge this codemind entry into it (no secret in it):"
+  entry
+fi
+
+case "$host" in
+  cursor) echo "Next: open a new terminal, run 'cursor agent mcp enable codemind', then restart Cursor from that terminal." ;;
+  codex)  echo "Next: restart Codex from a new terminal, then run 'codex mcp list' to see the codemind entry." ;;
+  *)      echo "Next: restart your agent from a new terminal; approve the project-scoped 'codemind' server if asked." ;;
+esac
+
+2. Tell me to run it myself, with the name of the agent you are (claude, cursor, codex or opencode), and wait until I say it is done: in Claude Code, type ! sh codemind-setup.sh claude ; in another agent, run sh codemind-setup.sh <name> in a terminal in this project. Do not run it yourself, and do not run any other command that creates an account or prints a key. The script puts CODEMIND_API_KEY in my shell profile and writes the server entry for that agent, with no secret in it (Claude Code ./.mcp.json, Cursor ./.cursor/mcp.json, OpenCode ./opencode.json, Codex config.toml in my home directory). If it says a config file already exists and was not changed, merge the entry it printed into that file for me.
+
+3. Tell me to restart this agent from a new terminal in this project, so that it sees CODEMIND_API_KEY and the new tools, and to follow the "Next:" line the script printed (Cursor needs one approval command). If the agent asks me to approve the project-scoped "codemind" server, tell me to approve it.
+
+4. Remind me to open the claim link the script printed. Until I do, the account is anonymous: it has no owner, I cannot see it in the dashboard, and it expires if unused.
+
+5. Do not call create_free_account. If a Codemind call later fails with an auth error, call get_usage_guide with topic "auth" and follow it.
+
+After the restart, confirm by calling the Codemind tool list_builds yourself (not curl with the key); an empty list means it works.
+```
+<!-- onboarding-prompt:new-account:end -->
+
+Already has an account and an API key (for example from the dashboard):
+
+<!-- onboarding-prompt:existing-key:start -->
+```text
+Set up Codemind for this project. Codemind is a remote MCP server that writes and verifies code from a story. I already have a Codemind account and an API key for it.
+
+1. Do not call create_free_account: that would create a second, separate account. Do not ask me to paste the key into this chat.
+
+2. I will store the key myself as the environment variable CODEMIND_API_KEY in the file my shell reads for every new interactive terminal (check $SHELL: ~/.zshrc for zsh, ~/.bashrc for bash, ~/.bash_profile for bash on macOS), so that this agent's own process has it when it starts. A project .env file is not enough: agents do not read it when they connect to an MCP server. Tell me the exact line to add, with a placeholder for the key, and wait until I say it is set. Do not print the key, and do not write it into the MCP config itself.
+
+3. Add Codemind to this agent's MCP configuration as a remote HTTP server named "codemind":
+   URL https://api.codemindhq.dev/mcp, header "Authorization: Bearer ${CODEMIND_API_KEY}".
+   Use this agent's own config file and format. If the format cannot read an environment variable, tell me and stop; do not paste the key in.
+
+4. Tell me to restart this agent from a new terminal, so that it sees CODEMIND_API_KEY and the new tools, and what to do after the restart. If the agent asks me to approve the project-scoped "codemind" server, tell me to approve it.
+
+5. If a Codemind call later fails with an auth error, call get_usage_guide with topic "auth" and follow it.
+
+When that is done, confirm by calling the Codemind tool list_builds itself (not curl with the key); a list, empty or not, means it works.
+```
+<!-- onboarding-prompt:existing-key:end -->
 
 **Every tool returns formatted text, not a JSON object** — read values
 out of the text (the one exception is the webhook JSON payload in
@@ -126,16 +306,17 @@ private-registry limits: [reference/patch-mode.md](reference/patch-mode.md).
 build_feature({
   storyTitle: "<title>",
   acceptanceCriteria: "<full spec>",
-  stackType: "<worker|python|go|swift-ios|kotlin-android|...>",
+  stackType: "<worker|node|react|...>",
   existingFiles: [...],   // when modifying existing code
   projectId: "<stable slug for this codebase>",
 })
 ```
 
-`stackType` accepts any string, but only `worker`, `python`, `go`,
-`swift-ios`, `kotlin-android` are confirmed production-ready — `rust`
-is experimental (expect failure on multi-file workspaces, not
-something a better spec fixes). Full detail:
+`stackType` is free text. JavaScript and TypeScript are the only
+supported stacks today (`worker`, `node`, `react` and variants).
+Python, Go, Swift, Kotlin and Rust are refused with
+`UNSUPPORTED_STACK_TYPE` and a message naming the supported stacks.
+Full detail:
 [reference/stacks-and-errors.md](reference/stacks-and-errors.md).
 
 The response is one of three things:
@@ -156,7 +337,7 @@ The response is one of three things:
   self-serve upgrade path today — don't suggest "upgrade your plan" as
   an actionable step; tell your user the limit was hit and, for
   `PLAN_LIMIT_EXCEEDED` specifically, that raising it requires contact
-  outside this API (see codemindhq.dev/contact.html). This does NOT
+  outside this API (email support@codemindhq.dev). This does NOT
   apply to `CAPACITY_EXHAUSTED` below — that one is global generation
   capacity, unrelated to plan tier, and a plan change would not help
   it at all.
