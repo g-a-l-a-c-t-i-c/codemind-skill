@@ -26,6 +26,10 @@ The MCP server is `https://api.codemindhq.dev/mcp` (also listed in the official 
 
 Questions: support@codemindhq.dev
 
+## Data
+
+The Skill sends your task, acceptance criteria, any source files you choose to include, and your Codemind API key to `https://api.codemindhq.dev/mcp`, the Codemind service. Codemind stores the task, the files you send, the code it generates and a verification report for the life of your account, and deletes them on request. Creating an account stores an email address. See the [Privacy Policy](https://codemindhq.dev/privacy/). The Skill sends nothing to any other service and is not intended for users under 18.
+
 ## License
 
 [MIT](LICENSE). This covers the files in this repository only. The Codemind service is governed by its [Terms](https://codemindhq.dev/terms/), and the Codemind name and logo are not licensed.
