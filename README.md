@@ -24,3 +24,7 @@ The MCP server is `https://api.codemindhq.dev/mcp` (also listed in the official 
 | `EVALS.md` | Scenarios the Skill was checked against |
 
 Questions: support@codemindhq.dev
+
+## License
+
+[MIT](LICENSE). This covers the files in this repository only. The Codemind service is governed by its [Terms](https://codemindhq.dev/terms/), and the Codemind name and logo are not licensed.
