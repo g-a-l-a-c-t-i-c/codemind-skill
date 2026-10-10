@@ -1,0 +1,11 @@
+{
+  "name": "codemind",
+  "displayName": "Codemind",
+  "version": "1.0.0",
+  "description": "Hand routine JavaScript and TypeScript tasks to Codemind, a remote MCP server that returns tested files. The skill sets up a free account and connects your agent itself.",
+  "author": { "name": "Codemind", "url": "https://codemindhq.dev" },
+  "homepage": "https://codemindhq.dev",
+  "repository": "https://github.com/g-a-l-a-c-t-i-c/codemind-skill",
+  "license": "MIT",
+  "keywords": ["mcp", "code-generation", "typescript", "javascript", "testing"]
+}

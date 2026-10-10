@@ -1,0 +1,12 @@
+{
+  "name": "codemind",
+  "description": "Codemind plugins for Claude Code",
+  "owner": { "name": "Codemind", "email": "support@codemindhq.dev" },
+  "plugins": [
+    {
+      "name": "codemind",
+      "source": "./",
+      "description": "Hand routine JavaScript and TypeScript tasks to Codemind, a remote MCP server that returns tested files."
+    }
+  ]
+}

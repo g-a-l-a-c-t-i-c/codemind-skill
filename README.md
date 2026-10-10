@@ -8,7 +8,7 @@ An [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) that teache
 
 ## Use it
 
-The Skill lets an agent create its own free account and connect itself, with no key pasted into chat. Copy `SKILL.md` into your agent's skills folder, or open [codemindhq.dev/agent-setup](https://codemindhq.dev/agent-setup?utm_source=github&utm_medium=skill-repo&utm_campaign=codemind-skill-readme) and paste the one setup prompt it shows.
+The Skill lets an agent create its own free account and connect itself, with no key pasted into chat. In Claude Code, install the plugin: `claude plugin marketplace add g-a-l-a-c-t-i-c/codemind-skill`, then `claude plugin install codemind@codemind`. For other agents, copy `skills/codemind/SKILL.md` into your agent's skills folder, or open [codemindhq.dev/agent-setup](https://codemindhq.dev/agent-setup?utm_source=github&utm_medium=skill-repo&utm_campaign=codemind-skill-readme) and paste the one setup prompt it shows.
 
 The MCP server is `https://api.codemindhq.dev/mcp` (also listed in the official MCP registry as `dev.codemindhq/codemind`).
 
@@ -16,12 +16,13 @@ The MCP server is `https://api.codemindhq.dev/mcp` (also listed in the official 
 
 | File | Purpose |
 |---|---|
-| `SKILL.md` | The Skill: setup, how to write a task, how to read results and failures |
-| `reference/spec-writing.md` | How to write acceptance criteria that build first time |
-| `reference/tools.md` | Every tool the server exposes |
-| `reference/patch-mode.md` | Changing existing files |
-| `reference/stacks-and-errors.md` | Supported stacks and error codes |
-| `EVALS.md` | Scenarios the Skill was checked against |
+| `.claude-plugin/` | Plugin manifest and single-plugin marketplace for Claude Code |
+| `skills/codemind/SKILL.md` | The Skill: setup, how to write a task, how to read results and failures |
+| `skills/codemind/reference/spec-writing.md` | How to write acceptance criteria that build first time |
+| `skills/codemind/reference/tools.md` | Every tool the server exposes |
+| `skills/codemind/reference/patch-mode.md` | Changing existing files |
+| `skills/codemind/reference/stacks-and-errors.md` | Supported stacks and error codes |
+| `skills/codemind/EVALS.md` | Scenarios the Skill was checked against |
 
 Questions: support@codemindhq.dev
 
