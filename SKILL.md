@@ -101,6 +101,7 @@ Setup creates an account and stores its key. Do not create the account, read the
 # Run it yourself (in Claude Code: `! sh codemind-setup.sh`). It stores the key
 # in your shell profile and never prints it. The agent never sees the key.
 set -eu
+# codemind-utm-defaults
 
 host="${1:-claude}"
 case "$host" in
@@ -125,10 +126,21 @@ else
     exit 1
   fi
 
+  # Optional signup source (CODEMIND_UTM_SOURCE / _MEDIUM / _CAMPAIGN). Only simple tags are
+  # forwarded, so nothing can break the JSON; anything else is dropped.
+  args=""
+  for pair in "utm_source:${CODEMIND_UTM_SOURCE:-}" "utm_medium:${CODEMIND_UTM_MEDIUM:-}" "utm_campaign:${CODEMIND_UTM_CAMPAIGN:-}"; do
+    k="${pair%%:*}"; v="${pair#*:}"
+    case "$v" in
+      ""|*[!A-Za-z0-9_.-]*) continue ;;
+    esac
+    [ "${#v}" -le 64 ] || continue
+    args="${args:+$args,}\"$k\":\"$v\""
+  done
   reply=$(curl -fsS -X POST https://api.codemindhq.dev/mcp \
     -H 'content-type: application/json' \
     -H 'accept: application/json, text/event-stream' \
-    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_free_account","arguments":{}}}')
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_free_account","arguments":{'"$args"'}}}')
 
   key=$(printf '%s' "$reply" | grep -o 'apiKey: [A-Za-z0-9._-]*' | head -1 | cut -d' ' -f2)
   tenant=$(printf '%s' "$reply" | grep -o 'tenantId: [A-Za-z0-9-]*' | head -1 | cut -d' ' -f2)
