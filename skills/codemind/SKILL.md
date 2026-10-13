@@ -95,7 +95,7 @@ Setup creates a free account and saves its key. Do not create the account any ot
 2. Tell me the claim link that init printed, and remind me to open it. Until I do, the account is anonymous: it has no owner, I cannot see it in the dashboard, and it expires if unused.
 
 3. Install the Codemind skill, so that every later session in this project knows how to use it without me pasting anything:
-   npx skills add g-a-l-a-c-t-i-c/codemind-skill -a <your own agent name, for example claude-code, cursor, codex or opencode> -y
+   npx skills add https://codemindhq.dev -a <your own agent name, for example claude-code, cursor, codex or opencode> -y
    If that is refused or fails, say so and go on.
 
 4. For how to build, run: npx @g-a-l-a-c-t-i-c/codemind@latest skill
