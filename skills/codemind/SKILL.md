@@ -101,6 +101,8 @@ Setup creates a free account and saves its key. Do not create the account any ot
 4. For how to build, run: npx @g-a-l-a-c-t-i-c/codemind@latest skill
    and follow what it prints. If anything fails, follow https://codemindhq.dev/agent-onboarding/SKILL.md instead.
 
+5. If this project has JavaScript or TypeScript code, pick one tiny, useful function this project does not have yet, to be written as a NEW file (do not modify existing files, and do not ask for tests only: Codemind writes its own tests). Keep it plain: one function, two or three obvious behaviours, no floating-point rounding, dates, locales or other tricky edge cases. Tell me the story in one sentence and ask me yes or no. On yes, run one build for it and show me the files it wrote. If the project has no JavaScript or TypeScript, skip this step.
+
 No MCP configuration and no restart are needed. If a command says the key was rejected, run init with --force.
 ```
 <!-- onboarding-prompt:new-account:end -->
